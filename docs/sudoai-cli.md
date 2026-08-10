@@ -1,10 +1,17 @@
 # SudoAI CLI — User Documentation
 
-SudoAI CLI is the terminal version of SudoAI. It is designed to become a coding agent that can work inside a local project, similar in workflow to modern terminal coding agents.
+SudoAI CLI is the terminal version of SudoAI. It works inside a local project and is the first step toward a full coding agent.
 
-## 1. Install / run
+## 1. Requirements
 
-The first MVP is distributed from the SudoAI repository:
+- Node.js 18+
+- Internet access
+- A reachable SudoAI deployment
+- A `SUDOAI_API_KEY` when your deployment requires authenticated CLI access
+
+## 2. Run the MVP
+
+Clone the repository:
 
 ```bash
 git clone https://github.com/sudobuildorg/sudoai.git
@@ -12,64 +19,110 @@ cd sudoai/cli
 npm start
 ```
 
-You need Node.js 18+.
-
-For a one-shot request:
+Or run it directly:
 
 ```bash
-node src/index.mjs "explain this project"
+node src/index.mjs
 ```
 
-## 2. Configure SudoAI
+One-shot mode:
 
-The CLI uses the hosted SudoAI API by default:
+```bash
+node src/index.mjs "find the authentication bug"
+```
+
+## 3. Configuration
+
+Default API:
 
 ```text
 https://sudoai.vercel.app
 ```
 
-You can use another deployment:
+Custom deployment:
 
 ```bash
 export SUDOAI_API_URL="https://your-domain.example"
 ```
 
-If your deployment requires a CLI API key:
+CLI key:
 
 ```bash
 export SUDOAI_API_KEY="YOUR_KEY"
 ```
 
-Keep the key private. Do not put it in source code or commit it to GitHub.
+Optional model:
 
-## 3. Start the agent
+```bash
+export SUDOAI_MODEL="llama-3.1-8b-instant"
+```
 
-From your project directory:
+Never commit secrets to GitHub.
+
+## 4. Start inside your project
+
+Always start the CLI from the project you want the agent to inspect:
 
 ```bash
 cd ~/projects/my-app
 node /path/to/sudoai/cli/src/index.mjs
 ```
 
-Then ask:
+Then:
 
 ```text
-> inspect the authentication code and tell me what is wrong
+> inspect the authentication code
+> find the bug
+> fix it
+> run the tests
 ```
 
-The model can request local tools. For example:
+## 5. Local tools
+
+The model can request these tools:
 
 ```text
-TOOL: list .
-TOOL: read_file src/auth.ts
-TOOL: run npm test
+TOOL:read_file <path>
+TOOL:list <path>
+TOOL:write_file <path>
+<complete file content>
+TOOL_END
+TOOL:run <shell command>
 ```
 
-The CLI executes these tools locally rather than on the SudoAI server.
+The CLI performs the action on the user's computer, not on the SudoAI server.
 
-## 4. Command safety
+### Read a file
 
-Every shell command requires confirmation:
+The agent can inspect a source file before making a recommendation.
+
+### List a directory
+
+The agent can inspect project structure without uploading the entire project.
+
+### Write a file
+
+The agent can create or replace a file, but the CLI asks for confirmation first.
+
+### Run a command
+
+The agent can request commands such as `npm test`, but the CLI asks for confirmation first.
+
+## 6. Safety
+
+The MVP requires confirmation before every file write and shell command.
+
+Example:
+
+```text
+⚠ SudoAI wants to write this file:
+
+src/auth.ts
+
+Allow? [y/N]
+```
+
+and:
 
 ```text
 ⚠ SudoAI wants to run this command:
@@ -79,73 +132,68 @@ npm test
 Allow? [y/N]
 ```
 
-Answer `y` to execute it. Any other answer denies it.
+Only `y` or `yes` approves the operation. Everything else denies it.
 
-This prevents the first MVP from silently executing arbitrary commands.
+File paths outside the current workspace are blocked.
 
-## 5. Current limitations
-
-This first CLI release is an MVP. It currently supports:
-
-- Interactive terminal chat
-- One-shot requests
-- Workspace-aware file reading
-- Directory listing
-- Local shell commands with confirmation
-- SudoAI model/provider routing through the existing `/api/chat` endpoint
-
-Not yet included:
-
-- `sudo login` device authentication
-- Native `npm install -g` package release
-- File editing/apply-patch tool
-- Git commit/push tools
-- MCP
-- Autonomous mode
-- VS Code integration
-- Server-side usage enforcement for CLI sessions
-
-These are deliberate next steps rather than hidden functionality.
-
-## 6. Recommended workflow
-
-Use the CLI from the root of the repository you want SudoAI to inspect:
-
-```bash
-cd my-project
-node /path/to/sudoai/cli/src/index.mjs
-```
-
-Useful prompts:
+## 7. Useful prompts
 
 ```text
 inspect this project structure
 find the authentication bug
-explain why the tests fail
+explain this error
 review the latest git diff
+fix the failing test
 run the tests and summarize failures
+refactor this component
 ```
 
-## 7. Troubleshooting
+## 8. Current MVP scope
 
-### API error
+Included:
 
-Verify `SUDOAI_API_URL` and the SudoAI deployment.
+- Interactive terminal chat
+- One-shot requests
+- Workspace-aware file reads
+- Directory listing
+- File creation/replacement with confirmation
+- Shell commands with confirmation
+- Provider/model routing through SudoAI `/api/chat`
+
+Next steps:
+
+- `sudo login` device authentication
+- Published `npm install -g` package
+- Git status/diff/commit tools
+- MCP support
+- Usage limits and server-side CLI authorization
+- Autonomous mode
+- VS Code extension
+
+## 9. Troubleshooting
+
+### `SudoAI returned an empty response`
+
+Check that the SudoAI deployment is running and `/api/chat` is reachable.
+
+### `fetch failed`
+
+Check your internet connection and `SUDOAI_API_URL`.
 
 ### Authentication error
 
-Set a valid `SUDOAI_API_KEY` when your deployment has CLI authentication enabled.
+Set a valid `SUDOAI_API_KEY` when CLI authentication is enabled.
 
 ### Command denied
 
-The CLI is intentionally confirmation-based. Run the request again and approve the command when prompted.
+The CLI requires approval. Answer `y` when you trust the requested command.
 
 ### Path outside workspace
 
-The MVP only allows file reads inside the directory where the CLI was started.
+Start the CLI from the project root and use relative paths inside that directory.
 
-## 8. Security recommendation
+## 10. Security
 
-Do not run the CLI in a directory containing secrets if you are asking it to inspect the entire project. The agent can read files you explicitly ask it to inspect.
+Do not run the agent in a directory containing secrets unless you understand which files it may inspect. Keep API keys out of source code and shell history where practical.
 
-Before using autonomous or unrestricted modes in a future release, review the requested commands and file changes carefully.
+This MVP intentionally does not provide unrestricted autonomous mode.
