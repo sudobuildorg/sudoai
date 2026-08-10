@@ -1,8 +1,8 @@
 # SudoAI CLI
 
-SudoAI CLI is the first terminal client for SudoAI. It lets you ask SudoAI questions from a project directory and gives the model controlled access to inspect files, list folders, and run terminal commands with confirmation.
+SudoAI CLI is the first terminal client for SudoAI. It lets you work with SudoAI from a project directory and gives the agent controlled access to inspect files, edit files, list folders, and run terminal commands with confirmation.
 
-> **MVP note:** this first release is intentionally conservative. File editing and authenticated CLI login are planned next. Do not treat the current CLI as the final Claude Code/Codex replacement yet.
+> **MVP note:** this is the first CLI release. Authenticated CLI login, Git tools, MCP, and autonomous mode are planned next.
 
 ## Requirements
 
@@ -28,6 +28,7 @@ node cli/src/index.mjs
 ```bash
 node cli/src/index.mjs "explain this project"
 node cli/src/index.mjs "find the authentication bug"
+node cli/src/index.mjs "fix the failing test"
 ```
 
 ## Configuration
@@ -64,15 +65,34 @@ The agent can request:
 
 - `read_file <path>` — read a workspace file
 - `list <path>` — list a directory
-- `run <command>` — execute a shell command after asking for confirmation
+- `write_file <path>` — replace/create a workspace file after confirmation
+- `run <command>` — execute a shell command after confirmation
 
-Commands run with the current directory as the workspace.
-
-The CLI blocks file paths outside the current workspace.
+Commands and file paths are executed locally on the user's computer. The CLI blocks paths outside the current workspace.
 
 ## Safety
 
-The CLI asks for confirmation before every shell command. This is intentional. A future release will add finer-grained permissions for edits, destructive commands, Git operations, and autonomous mode.
+The CLI asks for confirmation before every file write and shell command. This is intentional. The model cannot silently modify a file or execute a command.
+
+For example:
+
+```text
+⚠ SudoAI wants to write this file:
+
+src/app.ts
+
+Allow? [y/N]
+```
+
+or:
+
+```text
+⚠ SudoAI wants to run this command:
+
+npm test
+
+Allow? [y/N]
+```
 
 ## Commands
 
@@ -82,6 +102,23 @@ sudo "request"       Run a single request
 sudo --help          Show help
 exit                 Leave interactive mode
 ```
+
+## Example workflow
+
+```bash
+cd my-project
+node /path/to/sudoai/cli/src/index.mjs
+```
+
+Then:
+
+```text
+> inspect the project and find the login bug
+> fix it
+> run the tests
+```
+
+The agent can inspect files, propose a change, ask for permission to write it, and then ask before running tests.
 
 ## Troubleshooting
 
