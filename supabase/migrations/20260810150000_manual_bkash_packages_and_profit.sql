@@ -53,3 +53,6 @@ for each row execute function public.sync_payment_user_email();
 
 drop policy if exists profiles_admin_select on public.profiles;
 create policy profiles_admin_select on public.profiles for select to authenticated using (is_admin());
+
+drop policy if exists profiles_admin_update on public.profiles;
+create policy profiles_admin_update on public.profiles for update to authenticated using (is_admin()) with check (is_admin());
