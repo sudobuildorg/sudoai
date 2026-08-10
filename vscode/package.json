@@ -1,0 +1,67 @@
+{
+  "name": "sudoai-vscode",
+  "displayName": "SudoAI Code",
+  "description": "SudoAI coding agent for VS Code with local workspace tools.",
+  "version": "0.1.0",
+  "publisher": "sudobuild",
+  "license": "MIT",
+  "repository": "https://github.com/sudobuildorg/sudoai",
+  "engines": { "vscode": ">=1.96.0" },
+  "categories": ["Chat", "Other"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "chatParticipants": [
+      {
+        "id": "sudoai.code",
+        "name": "sudo",
+        "fullName": "SudoAI Code",
+        "description": "SudoAI coding agent. Inspect, edit, search and test the current workspace.",
+        "isSticky": true,
+        "commands": [
+          { "name": "fix", "description": "Investigate and fix a coding problem" },
+          { "name": "review", "description": "Review the current workspace or selected code" },
+          { "name": "test", "description": "Run or diagnose project tests" }
+        ]
+      }
+    ],
+    "configuration": {
+      "title": "SudoAI",
+      "properties": {
+        "sudoai.apiUrl": {
+          "type": "string",
+          "default": "https://sudoai.vercel.app",
+          "description": "SudoAI API URL."
+        },
+        "sudoai.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "SudoAI API key. Keep this private.",
+          "scope": "machine-overridable"
+        },
+        "sudoai.model": {
+          "type": "string",
+          "default": "",
+          "description": "Optional SudoAI model ID. Leave blank to use the server default."
+        },
+        "sudoai.maxToolSteps": {
+          "type": "number",
+          "default": 10,
+          "minimum": 1,
+          "maximum": 30,
+          "description": "Maximum local tool steps for one request."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./tsconfig.json",
+    "watch": "tsc -p ./tsconfig.json --watch",
+    "package": "npm run compile"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/vscode": "^1.96.0",
+    "typescript": "^5.7.0"
+  }
+}
