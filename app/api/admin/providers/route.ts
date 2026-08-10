@@ -12,14 +12,28 @@ const providers = [
 
 async function isAdmin(req: NextRequest) {
   const auth = req.headers.get('authorization') || '';
-  const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+  const token = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-  if (!token || !url || !key) return false;
-  const client = createClient(url, key, { auth: { persistSession: false } });
-  const { data: { user } } = await client.auth.getUser(token);
-  if (!user) return false;
-  const { data } = await client.from('admin_users').select('user_id').eq('user_id', user.id).maybeSingle();
+  const publicKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!token || !url || !publicKey) return false;
+
+  // First validate the access token with Supabase Auth.
+  const authClient = createClient(url, publicKey, { auth: { persistSession: false, autoRefreshToken: false } });
+  const { data: { user }, error: authError } = await authClient.auth.getUser(token);
+  if (authError || !user) return false;
+
+  // Use the server-only service key for the admin_users lookup when available.
+  // This avoids an RLS/is_admin recursion issue in the API route. The service key
+  // is never sent to the browser.
+  const dbClient = serviceKey
+    ? createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } })
+    : authClient;
+  const { data, error } = await dbClient.from('admin_users').select('user_id').eq('user_id', user.id).maybeSingle();
+  if (error) {
+    console.error('Admin provider authorization failed:', error.message);
+    return false;
+  }
   return Boolean(data);
 }
 
@@ -29,8 +43,7 @@ async function checkProvider(p: typeof providers[number]): Promise<Provider> {
   try {
     const headers: Record<string,string> = { Accept: 'application/json' };
     if (p.id === 'anthropic') { headers['x-api-key'] = apiKey; headers['anthropic-version'] = '2023-06-01'; }
-    else if (p.id === 'google') { /* Gemini authenticates this request with the query key below. */ }
-    else headers.Authorization = `Bearer ${apiKey}`;
+    else if (p.id !== 'google') headers.Authorization = `Bearer ${apiKey}`;
     const url = p.id === 'google' ? `${p.endpoint}?key=${encodeURIComponent(apiKey)}` : p.endpoint;
     const response = await fetch(url, { headers, cache: 'no-store' });
     if (!response.ok) return { ...p, configured: true, status: 'offline', balance: '—', note: `API check returned HTTP ${response.status}.` };
