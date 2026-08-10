@@ -1,34 +1,55 @@
 # SudoAI CLI
 
-SudoAI CLI is the first terminal client for SudoAI. It lets you work with SudoAI from a project directory and gives the agent controlled access to inspect files, edit files, list folders, and run terminal commands with confirmation.
-
-> **MVP note:** this is the first CLI release. Authenticated CLI login, Git tools, MCP, and autonomous mode are planned next.
+SudoAI CLI is the terminal client for SudoAI. It lets you work with SudoAI from any project directory and gives the agent controlled access to inspect files, edit files, list folders, and run terminal commands with confirmation.
 
 ## Requirements
 
 - Node.js 18 or newer
 - A SudoAI deployment reachable from your computer
-- `SUDOAI_API_KEY` when authenticated CLI access is enabled on your deployment
+- `SUDOAI_API_KEY` when authenticated CLI access is enabled
 
-## Run from the repository
+## Install globally
+
+From the repository:
 
 ```bash
 cd cli
-npm start
+npm install -g .
 ```
 
-Or:
+After installation, the command is:
 
 ```bash
-node cli/src/index.mjs
+sudoai
 ```
 
-## One-shot mode
+Check installation:
 
 ```bash
-node cli/src/index.mjs "explain this project"
-node cli/src/index.mjs "find the authentication bug"
-node cli/src/index.mjs "fix the failing test"
+sudoai --help
+```
+
+When the package is published to npm, the intended public installation will be:
+
+```bash
+npm install -g @sudobuild/sudoai-cli
+```
+
+## Start SudoAI
+
+Open a terminal in your project:
+
+```bash
+cd my-project
+sudoai
+```
+
+Or run a single request:
+
+```bash
+sudoai "explain this project"
+sudoai "find the authentication bug"
+sudoai "fix the failing test"
 ```
 
 ## Configuration
@@ -45,7 +66,7 @@ Override it with:
 export SUDOAI_API_URL=https://your-sudoai-domain.example
 ```
 
-Set the API key:
+Set the API key when required:
 
 ```bash
 export SUDOAI_API_KEY="your-cli-api-key"
@@ -59,6 +80,22 @@ export SUDOAI_MODEL="llama-3.1-8b-instant"
 
 Never commit API keys to Git.
 
+## Commands
+
+```text
+sudoai                  Start interactive mode
+sudoai "request"        Run a single request
+sudoai --help            Show help
+```
+
+Inside interactive mode:
+
+```text
+/help                   Show help
+/clear                  Clear the screen and start fresh
+/exit                   Exit SudoAI
+```
+
 ## Current tools
 
 The agent can request:
@@ -68,68 +105,22 @@ The agent can request:
 - `write_file <path>` — replace/create a workspace file after confirmation
 - `run <command>` — execute a shell command after confirmation
 
-Commands and file paths are executed locally on the user's computer. The CLI blocks paths outside the current workspace.
+Commands and file paths execute locally on the user's computer. Paths outside the current workspace are blocked.
 
 ## Safety
 
-The CLI asks for confirmation before every file write and shell command. This is intentional. The model cannot silently modify a file or execute a command.
-
-For example:
-
-```text
-⚠ SudoAI wants to write this file:
-
-src/app.ts
-
-Allow? [y/N]
-```
-
-or:
-
-```text
-⚠ SudoAI wants to run this command:
-
-npm test
-
-Allow? [y/N]
-```
-
-## Commands
-
-```text
-sudo                 Start interactive mode
-sudo "request"       Run a single request
-sudo --help          Show help
-exit                 Leave interactive mode
-```
-
-## Example workflow
-
-```bash
-cd my-project
-node /path/to/sudoai/cli/src/index.mjs
-```
-
-Then:
-
-```text
-> inspect the project and find the login bug
-> fix it
-> run the tests
-```
-
-The agent can inspect files, propose a change, ask for permission to write it, and then ask before running tests.
+The CLI asks for confirmation before every file write and shell command. The model cannot silently modify files or execute commands.
 
 ## Troubleshooting
 
 ### `SudoAI returned an empty response`
 
-Check that your SudoAI deployment is running and that `/api/chat` is reachable.
-
-### Provider/API error
-
-Check the provider configuration in the SudoAI server and your selected model.
+Check that your SudoAI deployment is running and `/api/chat` is reachable.
 
 ### `fetch failed`
 
 Check your internet connection and `SUDOAI_API_URL`.
+
+### Provider/API error
+
+Check provider configuration in the SudoAI server and the selected model.
