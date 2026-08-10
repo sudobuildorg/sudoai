@@ -17,7 +17,6 @@ const TOOL_PATTERN = /^TOOL:(read_file|list|search|write_file|run)\s+([\s\S]+)$/
 
 export function activate(context: vscode.ExtensionContext) {
   const participant = vscode.chat.createChatParticipant('sudoai.code', handleChat);
-  participant.iconPath = vscode.Uri.joinPath(context.extensionUri, 'icon.png');
   participant.followupProvider = {
     provideFollowups: async () => [
       { prompt: 'Run the tests and fix any failures.', label: 'Run tests' },
@@ -27,12 +26,7 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(participant);
 }
 
-async function handleChat(
-  request: vscode.ChatRequest,
-  context: vscode.ChatContext,
-  stream: vscode.ChatResponseStream,
-  token: vscode.CancellationToken
-): Promise<void> {
+async function handleChat(request: vscode.ChatRequest, context: vscode.ChatContext, stream: vscode.ChatResponseStream, token: vscode.CancellationToken): Promise<void> {
   try {
     const config = vscode.workspace.getConfiguration('sudoai');
     const apiUrl = String(config.get('apiUrl', 'https://sudoai.vercel.app')).replace(/\/$/, '');
@@ -40,32 +34,23 @@ async function handleChat(
     const configuredModel = String(config.get('model', ''));
     const maxSteps = Math.max(1, Math.min(30, Number(config.get('maxToolSteps', 10))));
     const workspace = vscode.workspace.workspaceFolders?.[0]?.uri;
+    if (!workspace) { stream.markdown('Open a workspace folder first so SudoAI can work with your project.'); return; }
 
-    if (!workspace) {
-      stream.markdown('Open a workspace folder first so SudoAI can work with your project.');
-      return;
-    }
-
-    const history = context.history
-      .filter((item): item is vscode.ChatRequestTurn | vscode.ChatResponseTurn =>
-        item instanceof vscode.ChatRequestTurn || item instanceof vscode.ChatResponseTurn)
-      .slice(-8)
-      .map((item) => {
-        if (item instanceof vscode.ChatRequestTurn) return { role: 'user', content: item.prompt };
-        return { role: 'assistant', content: item.response.map((part) => part instanceof vscode.ChatResponseMarkdownPart ? part.value.value : '').join('') };
-      })
-      .filter((item) => item.content);
+    const history = context.history.slice(-8).map((item) => {
+      if (item instanceof vscode.ChatRequestTurn) return { role: 'user' as const, content: item.prompt };
+      if (item instanceof vscode.ChatResponseTurn) return { role: 'assistant' as const, content: item.response.map((part) => part instanceof vscode.ChatResponseMarkdownPart ? part.value.value : '').join('') };
+      return undefined;
+    }).filter((item): item is { role: 'user' | 'assistant'; content: string } => Boolean(item?.content));
 
     const active = vscode.window.activeTextEditor;
     const selection = active && !active.selection.isEmpty
       ? `\nSelected code from ${vscode.workspace.asRelativePath(active.document.uri)}:\n${active.document.getText(active.selection).slice(0, 12000)}`
       : '';
 
-    const system = `You are SudoAI Code, an agentic coding assistant running inside VS Code. Workspace root: ${workspace.fsPath}.\n\nYou can inspect and modify the local workspace using tools. Do not claim an action happened unless a tool result confirms it. Prefer small, targeted changes. Ask for confirmation through the tool protocol before mutations.\n\nAvailable tools, each on its own line:\nTOOL:read_file {"path":"relative/path"}\nTOOL:list {"path":"relative/path"}\nTOOL:search {"query":"text"}\nTOOL:write_file {"path":"relative/path","content":"complete file contents"}\nTOOL:run {"command":"shell command"}\n\nFor write_file and run, the extension will ask the user for permission. Keep tool arguments as valid JSON. After receiving TOOL RESULT messages, continue the task. Never output a tool call inside a code fence.`;
-
+    const system = `You are SudoAI Code, an agentic coding assistant running inside VS Code. Workspace root: ${workspace.fsPath}.\n\nInspect and modify the local workspace using tools. Never claim an action happened unless a tool result confirms it. Prefer small, targeted changes.\n\nAvailable tools:\nTOOL:read_file {"path":"relative/path"}\nTOOL:list {"path":"relative/path"}\nTOOL:search {"query":"text"}\nTOOL:write_file {"path":"relative/path","content":"complete file contents"}\nTOOL:run {"command":"shell command"}\n\nFor write_file and run, the extension asks the user for permission. Keep tool arguments valid JSON. After TOOL RESULT messages, continue the task. Never put a tool call inside a code fence.`;
     const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
       { role: 'system', content: system },
-      ...history.map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content })),
+      ...history,
       { role: 'user', content: request.prompt + selection }
     ];
 
@@ -80,18 +65,13 @@ async function handleChat(
         stream.markdown(text);
         return;
       }
-
       const call = parseTool(match[1], match[2]);
-      if (!call) {
-        stream.markdown(text);
-        return;
-      }
+      if (!call) { stream.markdown(text); return; }
       stream.progress(`SudoAI wants to use ${call.name}…`);
       const result = await executeTool(call, workspace);
       messages.push({ role: 'assistant', content: text });
       messages.push({ role: 'user', content: `TOOL RESULT (${call.name}):\n${result}` });
     }
-
     stream.markdown('I reached the configured tool-step limit. Ask me to continue if you want another pass.');
   } catch (error) {
     stream.markdown(`**SudoAI error:** ${error instanceof Error ? error.message : String(error)}`);
@@ -106,9 +86,7 @@ function parseTool(name: string, raw: string): ToolCall | undefined {
     if (name === 'search' && typeof value.query === 'string') return { name, query: value.query };
     if (name === 'write_file' && typeof value.path === 'string' && typeof value.content === 'string') return { name, path: value.path, content: value.content };
     if (name === 'run' && typeof value.command === 'string') return { name, command: value.command };
-  } catch {
-    return undefined;
-  }
+  } catch { return undefined; }
   return undefined;
 }
 
@@ -126,13 +104,11 @@ async function executeTool(call: ToolCall, root: vscode.Uri): Promise<string> {
     const bytes = await vscode.workspace.fs.readFile(uri);
     return new TextDecoder().decode(bytes).slice(0, 50000);
   }
-
   if (call.name === 'list') {
     const uri = resolveWorkspacePath(root, call.path ?? '.');
     const entries = await vscode.workspace.fs.readDirectory(uri);
     return entries.map(([name, type]) => `${type === vscode.FileType.Directory ? 'dir ' : 'file'} ${name}`).join('\n');
   }
-
   if (call.name === 'search') {
     const results: string[] = [];
     await vscode.workspace.findTextInFiles(call.query, { include: '**/*', maxResults: 40 }, (result) => {
@@ -140,7 +116,6 @@ async function executeTool(call: ToolCall, root: vscode.Uri): Promise<string> {
     });
     return results.join('\n').slice(0, 20000) || 'No matches found.';
   }
-
   if (call.name === 'write_file') {
     const uri = resolveWorkspacePath(root, call.path);
     const answer = await vscode.window.showWarningMessage(`SudoAI wants to write ${vscode.workspace.asRelativePath(uri)}.`, 'Allow', 'Cancel');
@@ -148,12 +123,9 @@ async function executeTool(call: ToolCall, root: vscode.Uri): Promise<string> {
     await vscode.workspace.fs.writeFile(uri, new TextEncoder().encode(call.content));
     return `Wrote ${vscode.workspace.asRelativePath(uri)} successfully.`;
   }
-
   const answer = await vscode.window.showWarningMessage(`SudoAI wants to run:\n\n${call.command}`, 'Run', 'Cancel');
   if (answer !== 'Run') return 'User denied command execution.';
   return new Promise((resolve) => {
-    const terminal = vscode.window.createTerminal({ name: 'SudoAI' });
-    terminal.show(true);
     const shell = process.platform === 'win32' ? 'cmd.exe' : 'bash';
     const args = process.platform === 'win32' ? ['/d', '/s', '/c', call.command] : ['-lc', call.command];
     const child = require('node:child_process').spawn(shell, args, { cwd: root.fsPath });
@@ -171,21 +143,14 @@ async function callSudoAI(apiUrl: string, apiKey: string, model: string, message
   const controller = new AbortController();
   const subscription = token.onCancellationRequested(() => controller.abort());
   try {
-    const response = await fetch(`${apiUrl}/api/chat`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ messages, ...(model ? { model } : {}) }),
-      signal: controller.signal
-    });
+    const response = await fetch(`${apiUrl}/api/chat`, { method: 'POST', headers, body: JSON.stringify({ messages, ...(model ? { model } : {}) }), signal: controller.signal });
     const raw = await response.text();
     let data: AgentResponse & { error?: string } | null = null;
     try { data = raw ? JSON.parse(raw) : null; } catch { data = null; }
     if (!response.ok) throw new Error(data?.error || raw || `SudoAI request failed (${response.status})`);
     if (!data?.message) throw new Error('SudoAI returned an empty response.');
     return data;
-  } finally {
-    subscription.dispose();
-  }
+  } finally { subscription.dispose(); }
 }
 
 export function deactivate() {}
