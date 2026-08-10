@@ -21,7 +21,8 @@ export default function FileAttach(){
       wrap.dataset.fileAttach='true';
       wrap.style.display='inline-flex'; wrap.style.alignItems='center'; wrap.style.gap='6px';
       const input=document.createElement('input'); input.type='file'; input.multiple=true; input.accept=ACCEPT; input.style.display='none';
-      const button=document.createElement('button'); button.type='button'; button.textContent='＋ File'; button.title='Attach image, PDF, DOCX, ZIP, text or code';
+      const button=document.createElement('button'); button.type='button'; button.textContent='＋'; button.setAttribute('aria-label','Attach file'); button.title='Attach image, PDF, DOCX, ZIP, text or code';
+      button.style.fontSize='22px'; button.style.lineHeight='1'; button.style.padding='4px 8px';
       const status=document.createElement('span'); status.style.fontSize='12px'; status.style.opacity='.7'; status.style.maxWidth='180px'; status.style.overflow='hidden'; status.style.textOverflow='ellipsis'; status.style.whiteSpace='nowrap';
       button.onclick=()=>input.click();
       input.onchange=async()=>{
