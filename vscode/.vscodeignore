@@ -1,0 +1,7 @@
+src/**
+*.ts
+*.map
+node_modules/**
+.git/**
+.github/**
+README.md
