@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "SudoAI coding assistant for the terminal",
   "type": "module",
-  "bin": { "sudo": "./src/index.mjs" },
+  "bin": { "sudoai": "./src/index.mjs" },
   "engines": { "node": ">=18" },
   "scripts": { "start": "node src/index.mjs" },
   "files": ["src", "README.md"],
