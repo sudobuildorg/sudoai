@@ -26,6 +26,7 @@ export default function Home() {
   const [authError, setAuthError] = useState('');
   const [usage, setUsage] = useState(0);
   const [showUsage, setShowUsage] = useState(false);
+  const [showPlan, setShowPlan] = useState(false);
 
   const displayName = useMemo(() => profile.display_name || user?.email?.split('@')[0] || 'Guest', [profile, user]);
 
@@ -95,8 +96,9 @@ export default function Home() {
       conversationId = c.id; setActiveChat(c.id); setChats(prev => [c, ...prev]);
     }
     await supabase.from('messages').insert({ conversation_id: conversationId, user_id: user.id, role: 'user', content });
-    setMessages(prev => [...prev, { role: 'user', content }, { role: 'assistant', content: 'Your AI API is not connected yet. This message was saved successfully. Connect the API endpoint next to enable real AI responses.' }]);
-    await supabase.from('messages').insert({ conversation_id: conversationId, user_id: user.id, role: 'assistant', content: 'Your AI API is not connected yet. This message was saved successfully. Connect the API endpoint next to enable real AI responses.' });
+    const placeholder = 'Your AI API is not connected yet. This message was saved successfully. Connect the API endpoint next to enable real AI responses.';
+    setMessages(prev => [...prev, { role: 'user', content }, { role: 'assistant', content: placeholder }]);
+    await supabase.from('messages').insert({ conversation_id: conversationId, user_id: user.id, role: 'assistant', content: placeholder });
     await supabase.from('usage_daily').upsert({ user_id: user.id, usage_date: new Date().toISOString().slice(0,10), message_count: usage + 1 });
     setUsage(v => v + 1); setMessage('');
   }
@@ -111,8 +113,8 @@ export default function Home() {
       <div className="section">{user ? 'Your chats' : 'Preview'}</div>
       <div className="chatList">{(user ? chats : starterChats.map((title, i) => ({ id: `starter-${i}`, title }))).map(c => <button key={c.id} className={'chat '+(activeChat===c.id?'active':'')} onClick={() => user ? openChat(c.id) : setMessage(c.title)}>◯ {c.title}<small>•••</small></button>)}</div>
       {user && <div className="usageCard"><div><b>Daily usage</b><span>{profile.plan === 'pro' ? 'Pro' : `${usage}/${FREE_LIMIT}`}</span></div><div className="meter"><i style={{width: profile.plan === 'pro' ? '100%' : `${Math.min(100, usage/FREE_LIMIT*100)}%`}} /></div><button onClick={()=>setShowUsage(true)}>View usage</button></div>}
-      <div className="upgrade"><b>♛ {profile.plan === 'pro' ? 'SudoAI Pro' : 'Upgrade to Pro'}</b><p>{profile.plan === 'pro' ? 'You have Pro access.' : 'Higher limits, faster responses and more.'}</p><button>Upgrade now ↗</button></div>
-      {user ? <button className="account" onClick={signOut}><div className="avatar">{displayName[0]?.toUpperCase()}</div><div><b>{displayName}</b><small>{profile.plan.toUpperCase()} · Sign out</small></div><span>↪</span></button> : <button className="account" onClick={()=>setAuthOpen(true)}><div className="avatar">S</div><div><b>Sign in</b><small>Save your chats</small></div><span>→</span></button>}
+      <div className="upgrade"><b>♛ {profile.plan === 'pro' ? 'SudoAI Pro' : 'Upgrade to Pro'}</b><p>{profile.plan === 'pro' ? 'You have Pro access.' : 'Higher limits, faster responses and more.'}</p><button onClick={()=>setShowPlan(true)}>{profile.plan === 'pro' ? 'Manage plan ↗' : 'Upgrade now ↗'}</button></div>
+      {user ? <button className="account" onClick={()=>setShowPlan(true)}><div className="avatar">{displayName[0]?.toUpperCase()}</div><div><b>{displayName}</b><small>{profile.plan.toUpperCase()} · Manage plan</small></div><span>→</span></button> : <button className="account" onClick={()=>setAuthOpen(true)}><div className="avatar">S</div><div><b>Sign in</b><small>Save your chats</small></div><span>→</span></button>}
     </aside>
     <section className="main"><header><b>{activeChat ? (chats.find(c=>c.id===activeChat)?.title || 'Chat') : 'SudoAI'}</b><div className="headerRight"><label>Model</label><select><option>SudoAI 1.0</option></select><button>☾</button></div></header>
       <div className="conversation">
@@ -126,5 +128,6 @@ export default function Home() {
     </section>
     {authOpen && <div className="modalBackdrop"><form className="authModal" onSubmit={authenticate}><button type="button" className="close" onClick={()=>setAuthOpen(false)}>×</button><div className="modalLogo">sudo<span>ai</span></div><h2>{authMode==='login'?'Welcome back':'Create your SudoAI account'}</h2><p>{authMode==='login'?'Sign in to continue.':'Start with the SudoAI free plan.'}</p>{authMode==='signup' && <input value={name} onChange={e=>setName(e.target.value)} placeholder="Display name" required/>}<input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="Email" required/><input type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Password (min. 6 characters)" minLength={6} required/>{authError && <div className="authError">{authError}</div>}<button className="authSubmit">{authMode==='login'?'Sign in':'Create account'}</button><button type="button" className="switchAuth" onClick={()=>{setAuthMode(authMode==='login'?'signup':'login');setAuthError('')}}>{authMode==='login'?'Create a new account':'Already have an account? Sign in'}</button></form></div>}
     {showUsage && <div className="modalBackdrop" onClick={()=>setShowUsage(false)}><div className="usageModal" onClick={e=>e.stopPropagation()}><button className="close" onClick={()=>setShowUsage(false)}>×</button><h2>Usage</h2><p>Today</p><div className="bigUsage">{profile.plan==='pro' ? usage : `${usage} / ${FREE_LIMIT}`}</div><p>{profile.plan==='pro' ? 'Pro plan — no daily message cap configured.' : `${Math.max(0,FREE_LIMIT-usage)} messages remaining on the Free plan.`}</p><button className="authSubmit" onClick={()=>setShowUsage(false)}>Done</button></div></div>}
+    {showPlan && <div className="modalBackdrop" onClick={()=>setShowPlan(false)}><div className="planModal" onClick={e=>e.stopPropagation()}><button className="close" onClick={()=>setShowPlan(false)}>×</button><div className="modalLogo">sudo<span>ai</span></div><h2>{profile.plan==='pro'?'Manage your SudoAI plan':'Choose your SudoAI plan'}</h2><p className="planIntro">Plans are shown here. Stripe checkout will activate Pro after payment.</p><div className="plans"><div className={'planCard '+(profile.plan==='free'?'selected':'')}><div><b>Free</b><span>Current</span></div><strong>$0</strong><p>20 AI messages per day<br/>Chat history<br/>Basic SudoAI access</p><button onClick={()=>setShowPlan(false)}>Keep Free</button></div><div className="planCard pro"><div><b>Pro</b><span>Coming next</span></div><strong>$—<small>/month</small></strong><p>Higher AI limits<br/>Faster responses<br/>Priority access</p><button onClick={()=>setAuthError('Stripe checkout is not connected yet. Add Stripe keys and a Pro Price ID to enable payments.')} >Upgrade to Pro</button>{authError && <div className="planError">{authError}</div>}</div></div></div></div>}
   </main>;
 }
