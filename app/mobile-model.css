@@ -1,0 +1,18 @@
+/* SudoAI mobile model selector fix */
+@media (max-width: 760px) {
+  .composeBottom { gap: 8px; }
+  .composeBottom > div { min-width: 0; flex: 1; justify-content: flex-end; }
+  .composeBottom select {
+    display: block !important;
+    width: min(100%, 245px);
+    min-width: 0;
+    max-width: 245px;
+    padding: 8px 30px 8px 10px;
+    font-size: 11px;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .composeBottom button { flex: 0 0 35px; }
+}
